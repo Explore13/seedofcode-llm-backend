@@ -1,15 +1,50 @@
-version: '3.8'
 
 services:
   redis:
     image: redis:7-alpine
     container_name: seedofcode-llm-redis
-    ports:
-      - '6379:6379'
-    volumes:
-      - redis_data:/data
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: >
+      redis-server
+      --save ""
+      --appendonly no
+      --requirepass ${REDIS_PASSWORD}
+    networks:
+      - internal
+    # No `ports:` block by default if both app and redis are in docker.
+    # However, since we are running NestJS locally on the host machine during dev,
+    # we MUST expose the port to localhost so the app can connect!
+    ports:
+      - '127.0.0.1:6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
-volumes:
-  redis_data:
+  # app:
+  #   build: .
+  #   container_name: seedofcode-llm-api
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: 6379
+  #     REDIS_PASSWORD: ${REDIS_PASSWORD}
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - internal
+  #   ports:
+  #     - '3000:3000'   # NestJS itself, fronted by Nginx per §9 of the Architecture doc
+
+networks:
+  internal:
+    driver: bridge
+
+# No top-level `volumes:` — persistence is intentionally disabled.
+# NOTE (see Architecture §2a): this decision must be revisited once BullMQ is added
+# on Day 2 — job queue data has different durability requirements than rate-limit
+# counters, and losing in-flight jobs on a Redis restart is a real user-facing failure.
