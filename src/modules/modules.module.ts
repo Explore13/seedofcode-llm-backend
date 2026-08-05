@@ -18,6 +18,7 @@ import { MailModule } from './mail/mail.module';
     ModelsModule,
     WorkerModule,
     MailModule,
+    ApiKeysModule,
   ],
   controllers: [],
   providers: [],
