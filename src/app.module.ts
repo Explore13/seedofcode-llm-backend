@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { LoggerModule } from 'nestjs-pino';
+import { randomUUID } from 'crypto';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -12,6 +14,20 @@ import { typeOrmConfig } from './config/db';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        genReqId: (req) => req.headers['x-request-id'] || randomUUID(),
+        transport:
+          process.env.NODE_ENV !== 'production'
+            ? {
+              target: 'pino-pretty',
+              options: {
+                singleLine: true,
+              },
+            }
+            : undefined,
+      },
+    }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: typeOrmConfig,
@@ -21,4 +37,4 @@ import { typeOrmConfig } from './config/db';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
