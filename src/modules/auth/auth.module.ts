@@ -10,6 +10,7 @@ import { UserModule } from '../user/user.module';
 import { MailModule } from '../mail/mail.module';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { EmailOtp } from './entities/email-otp.entity';
+import { OtpService } from './otp.service';
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { EmailOtp } from './entities/email-otp.entity';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, OtpService],
   exports: [AuthService],
 })
 export class AuthModule {}

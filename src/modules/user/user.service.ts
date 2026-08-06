@@ -31,4 +31,9 @@ export class UserService {
     }
     return user;
   }
+
+  async update(id: string, updateData: Partial<User>): Promise<User> {
+    await this.userRepository.update(id, updateData);
+    return this.findById(id);
+  }
 }

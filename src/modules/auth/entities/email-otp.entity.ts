@@ -7,10 +7,18 @@ import {
   DeleteDateColumn,
 } from 'typeorm';
 
+export enum OtpPurpose {
+  EMAIL_VERIFICATION = 'email_verification',
+  PASSWORD_RESET = 'password_reset',
+}
+
 @Entity('email_otps')
 export class EmailOtp {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'enum', enum: OtpPurpose, default: OtpPurpose.EMAIL_VERIFICATION })
+  purpose: OtpPurpose;
 
   @Column({ nullable: true })
   userId: string; // Optional, might be used for password reset for existing users

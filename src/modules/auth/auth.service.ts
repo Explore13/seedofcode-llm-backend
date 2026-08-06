@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, NotFoundException, BadRequestException, ForbiddenException, HttpException, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -6,9 +6,9 @@ import { Repository, LessThan, IsNull } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
 import { UserService } from '../user/user.service';
-import { MailService } from '../mail/mail.service';
 import { RefreshToken } from './entities/refresh-token.entity';
-import { EmailOtp } from './entities/email-otp.entity';
+import { OtpPurpose } from './entities/email-otp.entity';
+import { OtpService } from './otp.service';
 import { RegisterDto, LoginDto, VerifyOtpDto } from './dto/auth.dto';
 import { User } from '../user/entities/user.entity';
 
@@ -18,11 +18,9 @@ export class AuthService {
     private userService: UserService,
     private jwtService: JwtService,
     private configService: ConfigService,
-    private mailService: MailService,
+    private otpService: OtpService,
     @InjectRepository(RefreshToken)
     private refreshTokenRepo: Repository<RefreshToken>,
-    @InjectRepository(EmailOtp)
-    private otpRepo: Repository<EmailOtp>,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -31,7 +29,11 @@ export class AuthService {
       email: registerDto.email,
       password: hashedPassword,
       name: registerDto.name,
+      // verified: false is default from the DB
     });
+
+    // Automatically generate OTP in the background
+    this.requestEmailVerification(user.id).catch(e => console.error('Failed to auto-generate OTP on register', e));
 
     return this.generateTokens(user);
   }
@@ -126,72 +128,33 @@ export class AuthService {
 
   // OTP System
 
-  async generateOtp(email: string) {
-    await this.cleanupExpiredOtp();
-
-    const existingValidOtp = await this.otpRepo.findOne({
-      where: { email, verifiedAt: IsNull() },
-      order: { createdAt: 'DESC' }
-    });
-
-    if (existingValidOtp && existingValidOtp.expiresAt > new Date()) {
-      return { message: 'OTP already sent.', expiresAt: existingValidOtp.expiresAt };
+  async requestEmailVerification(userId: string) {
+    const user = await this.userService.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const hashedOtp = await bcrypt.hash(otp, 10);
+    if (user.verified) {
+      return { alreadyVerified: true, message: 'User is already verified' };
+    }
+
+    return this.otpService.generate(userId, user.email, OtpPurpose.EMAIL_VERIFICATION);
+  }
+
+  async confirmEmailVerification(userId: string, otp: string) {
+    const user = await this.userService.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.verified) {
+      return { alreadyVerified: true, message: 'User is already verified' };
+    }
+
+    await this.otpService.verify(userId, otp, OtpPurpose.EMAIL_VERIFICATION);
     
-    const expiryMinutes = this.configService.get<number>('OTP_EXPIRY_MINUTES', 5);
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + expiryMinutes);
+    await this.userService.update(user.id, { verified: true });
 
-    await this.otpRepo.save(
-      this.otpRepo.create({
-        email,
-        otp: hashedOtp,
-        expiresAt,
-      })
-    );
-
-    const sent = await this.mailService.sendOtpEmail(email, otp);
-    if (!sent) {
-      throw new BadRequestException('Failed to send OTP email');
-    }
-
-    return { message: 'OTP sent successfully', expiresAt };
-  }
-
-  async verifyOtp(verifyOtpDto: VerifyOtpDto) {
-    const record = await this.otpRepo.findOne({
-      where: { email: verifyOtpDto.email, verifiedAt: IsNull() },
-      order: { createdAt: 'DESC' }
-    });
-
-    if (!record) {
-      throw new NotFoundException('OTP record not found');
-    }
-
-    if (record.expiresAt < new Date()) {
-      throw new BadRequestException('OTP has expired');
-    }
-
-    const isValid = await bcrypt.compare(verifyOtpDto.otp, record.otp);
-    if (!isValid) {
-      record.attempts += 1;
-      await this.otpRepo.save(record);
-      throw new BadRequestException('Invalid OTP');
-    }
-
-    record.verifiedAt = new Date();
-    await this.otpRepo.save(record);
-
-    return { success: true, message: 'OTP verified successfully' };
-  }
-
-  async cleanupExpiredOtp() {
-    await this.otpRepo.delete({
-      expiresAt: LessThan(new Date()),
-      verifiedAt: IsNull()
-    });
+    return { verified: true, message: 'Email verified successfully' };
   }
 }
