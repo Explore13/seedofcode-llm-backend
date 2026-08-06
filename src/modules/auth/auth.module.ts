@@ -11,12 +11,16 @@ import { MailModule } from '../mail/mail.module';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { EmailOtp } from './entities/email-otp.entity';
 import { OtpService } from './otp.service';
+import { ApiKeysModule } from '../apikeys/apikeys.module';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { HybridAuthGuard } from './guards/hybrid-auth.guard';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([RefreshToken, EmailOtp]),
     UserModule,
     MailModule,
+    ApiKeysModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -28,7 +32,7 @@ import { OtpService } from './otp.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, OtpService],
-  exports: [AuthService],
+  providers: [AuthService, JwtStrategy, OtpService, JwtAuthGuard, HybridAuthGuard],
+  exports: [AuthService, JwtAuthGuard, HybridAuthGuard, ApiKeysModule],
 })
-export class AuthModule {}
+export class AuthModule { }

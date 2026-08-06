@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import 'dotenv/config';
+import helmet from 'helmet';
+import compression from 'compression';
 import { NestFactory, Reflector } from '@nestjs/core';
+import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -18,11 +21,24 @@ import { HttpExceptionFilter } from './common/exceptions/http.exception';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
+    bufferLogs: true,
   });
 
-  // Enable CORS for frontend
+  app.useLogger(app.get(Logger));
+  app.use(helmet());
+  app.use(compression());
+
+  // Configure CORS using environment variable
+  const allowedOriginsStr = process.env.CORS_ALLOWED_ORIGINS || '*';
+  let origin: any = '*';
+  if (allowedOriginsStr !== '*') {
+    origin = allowedOriginsStr.split(',').map((o) => o.trim());
+  }
+
   app.enableCors({
-    origin: '*',
+    origin: origin,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
   });
 
   // Serve static assets from the "assets" directory

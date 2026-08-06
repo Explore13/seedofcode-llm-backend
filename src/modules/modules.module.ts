@@ -7,7 +7,7 @@ import { UsageModule } from './usage/usage.module';
 import { ModelsModule } from './models/models.module';
 import { WorkerModule } from './worker/worker.module';
 import { MailModule } from './mail/mail.module';
-
+import { AdminModule } from './admin/admin.module';
 @Module({
   imports: [
     UserModule,
@@ -16,9 +16,9 @@ import { MailModule } from './mail/mail.module';
     CreditsModule,
     UsageModule,
     ModelsModule,
+    AdminModule,
     WorkerModule,
     MailModule,
-    ApiKeysModule,
   ],
   controllers: [],
   providers: [],
