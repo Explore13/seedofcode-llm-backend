@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto, VerifyOtpDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './decorators/public.decorator';
+import { AllowUnverified } from './decorators/allow-unverified.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -40,6 +41,7 @@ export class AuthController {
 
   @ApiBearerAuth('bearerAuth')
   @UseGuards(JwtAuthGuard)
+  @AllowUnverified()
   @Post('logout')
   @ApiOperation({ summary: 'Logout user and invalidate refresh tokens' })
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
@@ -49,6 +51,7 @@ export class AuthController {
 
   @ApiBearerAuth('bearerAuth')
   @UseGuards(JwtAuthGuard)
+  @AllowUnverified()
   @Get('me')
   @ApiOperation({ summary: 'Get current logged in user details' })
   @ApiResponse({ status: 200, description: 'Current user profile' })
@@ -57,20 +60,24 @@ export class AuthController {
     return userWithoutPassword;
   }
 
-  @Public()
+  @ApiBearerAuth('bearerAuth')
+  @UseGuards(JwtAuthGuard)
+  @AllowUnverified()
   @Post('otp/generate')
-  @ApiOperation({ summary: 'Generate and send OTP to email' })
+  @ApiOperation({ summary: 'Generate and send OTP to email (Resend)' })
   @ApiResponse({ status: 201, description: 'OTP sent' })
-  async generateOtp(@Body('email') email: string) {
-    return this.authService.generateOtp(email);
+  async generateOtp(@Req() req: any) {
+    return this.authService.requestEmailVerification(req.user.id);
   }
 
-  @Public()
+  @ApiBearerAuth('bearerAuth')
+  @UseGuards(JwtAuthGuard)
+  @AllowUnverified()
   @Post('otp/verify')
   @ApiOperation({ summary: 'Verify OTP' })
   @ApiResponse({ status: 200, description: 'OTP verified' })
   @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
-  async verifyOtp(@Body() verifyOtpDto: VerifyOtpDto) {
-    return this.authService.verifyOtp(verifyOtpDto);
+  async verifyOtp(@Req() req: any, @Body() verifyOtpDto: VerifyOtpDto) {
+    return this.authService.confirmEmailVerification(req.user.id, verifyOtpDto.otp);
   }
 }
