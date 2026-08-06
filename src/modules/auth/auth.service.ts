@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, IsNull } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 
 import { UserService } from '../user/user.service';
 import { RefreshToken } from './entities/refresh-token.entity';
@@ -21,7 +22,7 @@ export class AuthService {
     private otpService: OtpService,
     @InjectRepository(RefreshToken)
     private refreshTokenRepo: Repository<RefreshToken>,
-  ) {}
+  ) { }
 
   async register(registerDto: RegisterDto) {
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
@@ -62,12 +63,15 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
+    if (!payload.jti) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
     const storedToken = await this.refreshTokenRepo.findOne({
-      where: { userId: payload.sub, revoked: false },
-      order: { createdAt: 'DESC' },
+      where: { id: payload.jti },
     });
 
-    if (!storedToken) {
+    if (!storedToken || storedToken.revoked) {
       throw new UnauthorizedException('Refresh token revoked or invalid');
     }
 
@@ -81,7 +85,7 @@ export class AuthService {
     }
 
     const user = await this.userService.findById(payload.sub);
-    
+
     // Rotate refresh token: revoke old one
     storedToken.revoked = true;
     await this.refreshTokenRepo.save(storedToken);
@@ -97,10 +101,12 @@ export class AuthService {
 
   private async generateTokens(user: User) {
     const payload = { email: user.email, sub: user.id, role: user.role };
-    
+
     const accessToken = this.jwtService.sign(payload);
-    
-    const refreshToken = this.jwtService.sign(payload, {
+
+    const jti = randomUUID();
+
+    const refreshToken = this.jwtService.sign({ ...payload, jti }, {
       secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN', '7d') as any,
     });
@@ -111,6 +117,7 @@ export class AuthService {
 
     await this.refreshTokenRepo.save(
       this.refreshTokenRepo.create({
+        id: jti,
         userId: user.id,
         tokenHash: hashedRefreshToken,
         expiresAt,
@@ -152,7 +159,7 @@ export class AuthService {
     }
 
     await this.otpService.verify(userId, otp, OtpPurpose.EMAIL_VERIFICATION);
-    
+
     await this.userService.update(user.id, { verified: true });
 
     return { verified: true, message: 'Email verified successfully' };
