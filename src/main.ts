@@ -21,7 +21,7 @@ import { HttpExceptionFilter } from './common/exceptions/http.exception';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
-    // bufferLogs: true,
+    bufferLogs: true,
   });
 
   app.useLogger(app.get(Logger));

@@ -27,6 +27,7 @@ import { typeOrmConfig } from './config/db';
             }
             : undefined,
       },
+      forRoutes: ['*path'],
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
