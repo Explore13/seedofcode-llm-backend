@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { InferenceController } from './inference.controller';
 import { AuthModule } from '../auth/auth.module';
 import { ModelsModule } from '../models/models.module';
+import { IsValidModelConstraint } from './validators/is-valid-model.validator';
 
 @Module({
   imports: [
@@ -13,5 +14,6 @@ import { ModelsModule } from '../models/models.module';
     ModelsModule
   ],
   controllers: [InferenceController],
+  providers: [IsValidModelConstraint],
 })
 export class InferenceModule { }

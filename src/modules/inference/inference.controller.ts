@@ -1,11 +1,10 @@
-import { Controller, Post, Body, Sse, UseGuards, Req, Request, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, Sse, UseGuards, Req, Request, Get } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue, QueueEvents } from 'bullmq';
 import { Observable } from 'rxjs';
 import { ChatRequestDto, GenerateRequestDto } from './dto/inference.dto';
 import { RedisService } from '../../common/redis/redis.service';
 import { HybridAuthGuard } from '../auth/guards/hybrid-auth.guard';
-import { ModelsService } from '../models/models.service';
 
 @UseGuards(HybridAuthGuard)
 @Controller()
@@ -15,28 +14,35 @@ export class InferenceController {
   constructor(
     @InjectQueue('generation') private readonly generationQueue: Queue,
     private readonly redisService: RedisService,
-    private readonly modelsService: ModelsService,
   ) {
     this.queueEvents = new QueueEvents('generation', { connection: this.generationQueue.opts.connection });
   }
 
-  private async validateModel(modelName: string) {
-    const modelExists = await this.modelsService.findByName(modelName);
-    if (!modelExists || !modelExists.enabled) {
-      throw new BadRequestException(`Model '${modelName}' is not available or disabled.`);
-    }
-  }
+  // DEMONSTRATION ROUTE: Open two terminal tabs.
+  // Tab 1: curl http://localhost:3000/api/block-event-loop
+  // Tab 2 (immediately after): curl http://localhost:3000/api/apikeys (or any other route)
+  // You will see Tab 2 completely HANGS for 10 seconds because Tab 1 froze the entire Node.js server!
+  // @Get('block-event-loop')
+  // blockEventLoop() {
+  //   console.log("FREEZING THE SERVER FOR 10 SECONDS...");
+  //   const end = Date.now() + 10000;
+  //   while (Date.now() < end) {
+  //     // This is a synchronous loop. Node.js is physically incapable of looking at other HTTP requests right now.
+  //     Math.sqrt(Math.random());
+  //   }
+  //   console.log("SERVER UN-FROZEN!");
+  //   return { message: 'The event loop is finally free! All other requests can now process.' };
+  // }
 
   @Post('chat')
   async chat(@Body() body: ChatRequestDto) {
-    await this.validateModel(body.model);
+
     const job = await this.generationQueue.add('chat', { ...body, stream: false });
     return await job.waitUntilFinished(this.queueEvents);
   }
 
   @Post('generate')
   async generate(@Body() body: GenerateRequestDto) {
-    await this.validateModel(body.model);
     const job = await this.generationQueue.add('generate', { ...body, stream: false });
     return await job.waitUntilFinished(this.queueEvents);
   }
@@ -44,7 +50,6 @@ export class InferenceController {
   @Post('chat/stream')
   @Sse()
   async chatStream(@Body() body: ChatRequestDto): Promise<Observable<any>> {
-    await this.validateModel(body.model);
     const job = await this.generationQueue.add('chat', { ...body, stream: true });
     return this.createStreamObservable(job.id!);
   }
@@ -52,7 +57,6 @@ export class InferenceController {
   @Post('generate/stream')
   @Sse()
   async generateStream(@Body() body: GenerateRequestDto): Promise<Observable<any>> {
-    await this.validateModel(body.model);
     const job = await this.generationQueue.add('generate', { ...body, stream: true });
     return this.createStreamObservable(job.id!);
   }
