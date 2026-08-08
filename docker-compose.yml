@@ -6,9 +6,10 @@ services:
     restart: unless-stopped
     command: >
       redis-server
-      --save ""
-      --appendonly no
+      --appendonly yes
       --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
     networks:
       - internal
     # No `ports:` block by default if both app and redis are in docker.
@@ -53,7 +54,6 @@ networks:
   internal:
     driver: bridge
 
-# No top-level `volumes:` — persistence is intentionally disabled.
-# NOTE (see Architecture §2a): this decision must be revisited once BullMQ is added
-# on Day 2 — job queue data has different durability requirements than rate-limit
-# counters, and losing in-flight jobs on a Redis restart is a real user-facing failure.
+volumes:
+  redis_data:
+    driver: local

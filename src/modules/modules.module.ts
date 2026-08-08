@@ -8,6 +8,8 @@ import { ModelsModule } from './models/models.module';
 import { WorkerModule } from './worker/worker.module';
 import { MailModule } from './mail/mail.module';
 import { AdminModule } from './admin/admin.module';
+import { InferenceModule } from './inference/inference.module';
+
 @Module({
   imports: [
     UserModule,
@@ -19,6 +21,7 @@ import { AdminModule } from './admin/admin.module';
     AdminModule,
     WorkerModule,
     MailModule,
+    InferenceModule,
   ],
   controllers: [],
   providers: [],
