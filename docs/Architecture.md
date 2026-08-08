@@ -588,8 +588,8 @@ server {
 - [x] Global middleware: Helmet, CORS, compression, request ID, Pino request logger
 
 ### **Day 2 — Queue & Inference Gateway**
-- [ ] Add Redis + BullMQ, create `generation` queue with priority by plan
-- [ ] Build `worker` service: consumes queue, calls Ollama (`/api/chat`, `/api/generate`), handles streaming responses back through SSE
+- [x] Add Redis + BullMQ, create `generation` queue with priority by plan
+- [x] Build `worker` service: consumes queue, calls Ollama (`/api/chat`, `/api/generate`), handles streaming responses back through SSE
 - [x] Build `/models` endpoint (list from Ollama, cache in `ModelInfo` table)
 - [x] Build `/chat`, `/chat/stream`, `/generate`, `/generate/stream` controllers → enqueue jobs, relay worker output to client
 - [ ] Health endpoints: `/health/database`, `/health/redis`, `/health/ollama`
