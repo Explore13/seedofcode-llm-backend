@@ -4,6 +4,7 @@ import { InferenceController } from './inference.controller';
 import { AuthModule } from '../auth/auth.module';
 import { ModelsModule } from '../models/models.module';
 import { IsValidModelConstraint } from './validators/is-valid-model.validator';
+import { CreditsModule } from '../credits/credits.module';
 
 @Module({
   imports: [
@@ -11,9 +12,10 @@ import { IsValidModelConstraint } from './validators/is-valid-model.validator';
       name: 'generation',
     }),
     AuthModule,
-    ModelsModule
+    ModelsModule,
+    CreditsModule,
   ],
   controllers: [InferenceController],
   providers: [IsValidModelConstraint],
 })
-export class InferenceModule { }
+export class InferenceModule {}

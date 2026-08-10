@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
 import { randomUUID } from 'crypto';
@@ -8,13 +9,16 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ModulesModule } from './modules/modules.module';
 import { typeOrmConfig } from './config/db';
+import { validateEnv } from './config/env.validation';
 import { RedisModule } from './common/redis/redis.module';
+import { HybridAuthGuard } from './modules/auth/guards/hybrid-auth.guard';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate: validateEnv,
     }),
     LoggerModule.forRoot({
       pinoHttp: {
@@ -22,11 +26,11 @@ import { RedisModule } from './common/redis/redis.module';
         transport:
           process.env.NODE_ENV !== 'production'
             ? {
-              target: 'pino-pretty',
-              options: {
-                singleLine: true,
-              },
-            }
+                target: 'pino-pretty',
+                options: {
+                  singleLine: true,
+                },
+              }
             : undefined,
       },
       forRoutes: ['*path'],
@@ -49,6 +53,11 @@ import { RedisModule } from './common/redis/redis.module';
     RedisModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    // Block unauthenticated (guest) traffic app-wide by default. Routes opt out
+    // with @Public(); HybridAuthGuard accepts both JWT and API-key bearers.
+    { provide: APP_GUARD, useExisting: HybridAuthGuard },
+  ],
 })
-export class AppModule { }
+export class AppModule {}

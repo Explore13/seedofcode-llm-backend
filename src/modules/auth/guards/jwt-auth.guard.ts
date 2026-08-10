@@ -34,7 +34,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     ]);
 
     if (user.verified || isAllowUnverified) {
-      return user;
+      return {
+        ...user,
+        authMethod: 'jwt',
+      };
     }
 
     // You can customize this error response fully if you use an HttpException or create a custom one.

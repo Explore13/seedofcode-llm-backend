@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -12,15 +12,18 @@ import { RefreshToken } from './entities/refresh-token.entity';
 import { EmailOtp } from './entities/email-otp.entity';
 import { OtpService } from './otp.service';
 import { ApiKeysModule } from '../apikeys/apikeys.module';
+import { CreditsModule } from '../credits/credits.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { HybridAuthGuard } from './guards/hybrid-auth.guard';
 
+@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([RefreshToken, EmailOtp]),
     UserModule,
     MailModule,
     ApiKeysModule,
+    CreditsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

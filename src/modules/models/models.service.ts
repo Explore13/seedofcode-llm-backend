@@ -1,4 +1,9 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ModelInfo, ModelProvider } from './entities/model-info.entity';
@@ -12,7 +17,7 @@ export class ModelsService {
     @InjectRepository(ModelInfo)
     private readonly modelInfoRepo: Repository<ModelInfo>,
     private readonly ollamaService: OllamaService,
-  ) { }
+  ) {}
 
   async findAllEnabled(): Promise<ModelInfo[]> {
     return this.modelInfoRepo.find({ where: { enabled: true } });
@@ -24,6 +29,32 @@ export class ModelsService {
 
   async findByFamily(family: string): Promise<ModelInfo[]> {
     return this.modelInfoRepo.find({ where: { family, enabled: true } });
+  }
+
+  async updateModel(
+    id: string,
+    updateData: {
+      enabled?: boolean;
+      creditsPerInputToken?: number;
+      creditsPerOutputToken?: number;
+    },
+  ): Promise<ModelInfo> {
+    const model = await this.modelInfoRepo.findOne({ where: { id } });
+    if (!model) {
+      throw new NotFoundException(`Model with ID ${id} not found`);
+    }
+
+    if (updateData.enabled !== undefined) {
+      model.enabled = updateData.enabled;
+    }
+    if (updateData.creditsPerInputToken !== undefined) {
+      model.creditsPerInputToken = updateData.creditsPerInputToken;
+    }
+    if (updateData.creditsPerOutputToken !== undefined) {
+      model.creditsPerOutputToken = updateData.creditsPerOutputToken;
+    }
+
+    return this.modelInfoRepo.save(model);
   }
 
   async syncFromOllama(): Promise<ModelInfo[]> {
@@ -38,46 +69,67 @@ export class ModelsService {
         let capabilities: string[] = [];
         let family: string | undefined = model.details?.family;
         let parameterSize: string | undefined = model.details?.parameter_size;
-        let quantizationLevel: string | undefined = model.details?.quantization_level;
+        let quantizationLevel: string | undefined =
+          model.details?.quantization_level;
+        let parameterCount: string | undefined;
 
         try {
           const showData: any = await this.ollamaService.showModel(model.name);
-          console.log(showData);
 
           if (showData.capabilities && Array.isArray(showData.capabilities)) {
             capabilities = showData.capabilities;
-          } else if (showData.details?.capabilities && Array.isArray(showData.details.capabilities)) {
+          } else if (
+            showData.details?.capabilities &&
+            Array.isArray(showData.details.capabilities)
+          ) {
             capabilities = showData.details.capabilities;
-          } else if (showData.model_info?.capabilities && Array.isArray(showData.model_info.capabilities)) {
+          } else if (
+            showData.model_info?.capabilities &&
+            Array.isArray(showData.model_info.capabilities)
+          ) {
             capabilities = showData.model_info.capabilities;
           }
 
           if (showData.details) {
             family = showData.details.family || family;
             parameterSize = showData.details.parameter_size || parameterSize;
-            quantizationLevel = showData.details.quantization_level || quantizationLevel;
+            quantizationLevel =
+              showData.details.quantization_level || quantizationLevel;
           }
 
           if (showData.model_info) {
-            const contextKeys = Object.keys(showData.model_info).filter(k => k.endsWith('.context_length'));
+            const contextKeys = Object.keys(showData.model_info).filter((k) =>
+              k.endsWith('.context_length'),
+            );
             if (contextKeys.length > 0) {
               maxContext = showData.model_info[contextKeys[0]];
             }
+            const paramCountRaw =
+              showData.model_info['general.parameter_count'];
+            if (paramCountRaw !== undefined && paramCountRaw !== null) {
+              parameterCount = paramCountRaw.toString();
+            }
           }
         } catch (showError) {
-          this.logger.warn(`Failed to fetch details for model ${model.name}: ${(showError as Error).message}`);
+          this.logger.warn(
+            `Failed to fetch details for model ${model.name}: ${(showError as Error).message}`,
+          );
         }
 
-        const existingModel = await this.modelInfoRepo.findOne({ where: { name: model.name } });
+        const existingModel = await this.modelInfoRepo.findOne({
+          where: { name: model.name },
+        });
 
         if (existingModel) {
           existingModel.maxContext = maxContext as any;
           existingModel.capabilities = capabilities;
           existingModel.family = family as any;
           existingModel.parameterSize = parameterSize as any;
+          existingModel.parameterCount = parameterCount as any;
           existingModel.quantizationLevel = quantizationLevel as any;
           existingModel.sizeBytes = model.size?.toString() as any;
           existingModel.digest = model.digest as any;
+          existingModel.enabled = true; // re-enable a model that reappeared in Ollama
           existingModel.lastSyncedAt = new Date();
           await this.modelInfoRepo.save(existingModel);
           syncedModels.push(existingModel);
@@ -90,6 +142,7 @@ export class ModelsService {
             capabilities,
             family: family as any,
             parameterSize: parameterSize as any,
+            parameterCount: parameterCount as any,
             quantizationLevel: quantizationLevel as any,
             sizeBytes: model.size?.toString() as any,
             digest: model.digest as any,
@@ -102,10 +155,28 @@ export class ModelsService {
         }
       }
 
+      // Disable any DB model that Ollama no longer reports, so inference
+      // validation can't pass for a model that has been removed from the host.
+      const currentNames = models.map((m) => m.name);
+      if (currentNames.length > 0) {
+        await this.modelInfoRepo
+          .createQueryBuilder()
+          .update(ModelInfo)
+          .set({ enabled: false })
+          .where('name NOT IN (:...currentNames)', { currentNames })
+          .andWhere('enabled = :enabled', { enabled: true })
+          .execute();
+      }
+
       return syncedModels;
     } catch (error) {
-      this.logger.error(`Error syncing models from Ollama: ${(error as Error).message}`, (error as Error).stack);
-      throw new InternalServerErrorException('Failed to sync models from Ollama');
+      this.logger.error(
+        `Error syncing models from Ollama: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw new InternalServerErrorException(
+        'Failed to sync models from Ollama',
+      );
     }
   }
 }

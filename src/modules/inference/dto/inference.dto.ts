@@ -1,6 +1,6 @@
 import { ArrayMinSize, IsArray, IsBoolean, IsIn, IsNotEmpty, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { IsValidModel } from '../validators/is-valid-model.validator';
+// import { IsValidModel } from '../validators/is-valid-model.validator';
 
 export class ChatMessage {
   @IsString({ message: 'Role must be a string' })
@@ -15,7 +15,7 @@ export class ChatMessage {
 export class ChatRequestDto {
   @IsString({ message: 'Model must be a string' })
   @IsNotEmpty({ message: 'Model name cannot be empty' })
-  @IsValidModel()
+  // @IsValidModel()
   model: string;
 
   @IsArray({ message: 'Messages must be an array' })
@@ -36,7 +36,7 @@ export class ChatRequestDto {
 export class GenerateRequestDto {
   @IsString({ message: 'Model must be a string' })
   @IsNotEmpty({ message: 'Model name cannot be empty' })
-  @IsValidModel()
+  //@IsValidModel()
   model: string;
 
   @IsString({ message: 'Prompt must be a string' })

@@ -1,3 +1,4 @@
+import { CreditTransaction } from 'src/modules/credits/entities/credit-transaction.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -5,6 +6,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   DeleteDateColumn,
+  OneToMany,
 } from 'typeorm';
 
 export enum UsageStatus {
@@ -21,8 +23,8 @@ export class UsageLog {
   @Column()
   userId: string;
 
-  @Column({ nullable: true })
-  apiKeyId?: string;
+  @Column({ type: 'uuid', nullable: true })
+  apiKeyId?: string | null;
 
   @Column()
   model: string;
@@ -41,6 +43,9 @@ export class UsageLog {
 
   @Column({ type: 'int' })
   creditsCost: number;
+
+  @OneToMany(() => CreditTransaction, (transaction) => transaction.usageLog)
+  creditTransactions: CreditTransaction[];
 
   @CreateDateColumn()
   createdAt: Date;

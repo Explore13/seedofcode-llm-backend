@@ -16,9 +16,12 @@ export default new DataSource({
   entities: ['src/**/*.entity.ts'],
   synchronize: false,
   migrations: ['src/database/migrations/*.ts'],
-  ssl: process.env[`${prefix}_SSL`] === 'true' ? {
-    rejectUnauthorized: false,
-  } : false,
+  ssl:
+    process.env[`${prefix}_SSL`] === 'true'
+      ? {
+          rejectUnauthorized: isProd,
+        }
+      : false,
   extra: {
     max: 20,
     idleTimeoutMillis: 30000,

@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Ollama } from 'ollama';
-import { ChatParams, GenerateParams, NormalizedChatResult, NormalizedGenerateResult } from './ollama.types';
+import {
+  ChatParams,
+  GenerateParams,
+  NormalizedChatResult,
+  NormalizedGenerateResult,
+} from './ollama.types';
 
 @Injectable()
 export class OllamaService {
@@ -10,7 +15,10 @@ export class OllamaService {
 
   constructor(private readonly configService: ConfigService) {
     this.client = new Ollama({
-      host: this.configService.get<string>('OLLAMA_URL', 'https://llm.seedofcode.dev'),
+      host: this.configService.get<string>(
+        'OLLAMA_HOST',
+        'http://127.0.0.1:11434',
+      ),
     });
   }
 
@@ -46,6 +54,7 @@ export class OllamaService {
       model: params.model,
       messages: params.messages,
       stream: true,
+      think: params.think as any,
       options: { ...this.defaultOptions, ...params.options },
     });
   }
@@ -78,5 +87,3 @@ export class OllamaService {
     });
   }
 }
-
-

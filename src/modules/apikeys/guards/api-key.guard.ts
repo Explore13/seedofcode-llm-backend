@@ -8,7 +8,7 @@ import { ApiKeysService } from '../apikeys.service';
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
-  constructor(private readonly apiKeysService: ApiKeysService) {}
+  constructor(private readonly apiKeysService: ApiKeysService) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -25,6 +25,7 @@ export class ApiKeyGuard implements CanActivate {
     }
 
     const keyData = await this.apiKeysService.validateKey(rawKey);
+
 
     if (!keyData) {
       throw new UnauthorizedException('Missing or invalid API Key');
