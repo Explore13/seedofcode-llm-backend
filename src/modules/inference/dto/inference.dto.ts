@@ -31,6 +31,10 @@ export class ChatRequestDto {
   @IsOptional()
   @IsBoolean({ message: 'Think must be a boolean' })
   think?: boolean;
+
+  @IsOptional()
+  @IsString({ message: 'Format must be a string (e.g., "json")' })
+  format?: string;
 }
 
 export class GenerateRequestDto {
@@ -50,4 +54,8 @@ export class GenerateRequestDto {
   @IsOptional()
   @IsBoolean({ message: 'Think must be a boolean' })
   think?: boolean;
+
+  @IsOptional()
+  @IsString({ message: 'Format must be a string (e.g., "json")' })
+  format?: string;
 }

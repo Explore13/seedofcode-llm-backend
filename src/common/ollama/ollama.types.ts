@@ -4,6 +4,7 @@ export interface ChatParams {
   options?: { temperature?: number; top_p?: number; num_ctx?: number };
   think?: boolean | 'low' | 'medium' | 'high' | 'max'; // optional — only meaningful for
   // models with the "thinking" capability
+  format?: string;
 }
 
 export interface NormalizedChatResult {
@@ -22,6 +23,7 @@ export interface GenerateParams {
   prompt: string;
   options?: { temperature?: number; top_p?: number; num_ctx?: number };
   think?: boolean | 'low' | 'medium' | 'high' | 'max';
+  format?: string;
 }
 
 export interface NormalizedGenerateResult {
