@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import 'dotenv/config';
-// import * as dns from 'dns';
-// // Force IPv4 for database resolution (Fixes Neon DB ENETUNREACH over IPv6)
-// dns.setDefaultResultOrder('ipv4first');
+import * as dns from 'dns';
+// Force IPv4 for database resolution (Fixes Neon DB ENETUNREACH over IPv6)
+dns.setDefaultResultOrder('ipv4first');
 
 import helmet from 'helmet';
 import compression from 'compression';
