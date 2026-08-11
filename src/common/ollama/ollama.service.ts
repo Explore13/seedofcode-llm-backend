@@ -37,6 +37,7 @@ export class OllamaService {
       model: params.model,
       messages: params.messages,
       stream: false,
+      format: params.format,
       think: params.think as any,
       options: { ...this.defaultOptions, ...params.options },
     });
@@ -55,6 +56,7 @@ export class OllamaService {
       model: params.model,
       messages: params.messages,
       stream: true,
+      format: params.format,
       think: params.think as any,
       options: { ...this.defaultOptions, ...params.options },
     });
@@ -66,6 +68,7 @@ export class OllamaService {
       model: params.model,
       prompt: params.prompt,
       stream: false,
+      format: params.format,
       think: params.think as any,
       options: { ...this.defaultOptions, ...params.options },
     });
@@ -83,6 +86,7 @@ export class OllamaService {
       model: params.model,
       prompt: params.prompt,
       stream: true,
+      format: params.format,
       think: params.think as any,
       options: { ...this.defaultOptions, ...params.options },
     });
