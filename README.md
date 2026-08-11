@@ -8,7 +8,7 @@ Welcome to the SeedOfCode LLM Platform! This guide provides everything you need 
 
 Before you can make API requests, you will need an active account and a valid API key.
 
-1. **Register**: Navigate to [llm.seedofcode.dev](https://llm.seedofcode.dev) (Note: The frontend UI is currently in development).
+1. **Register**: Navigate to [ai.seedofcode.dev](https://ai.seedofcode.dev) (Note: The frontend UI is currently in development).
 2. **Verify**: Complete the email verification process to activate your account.
 3. **Generate API Key**: Create a new API Key in your dashboard. Keep this key secure; you will only be able to view the full secret key once.
 4. **Credits**: New accounts receive a signup bonus of credits. Inference costs are calculated dynamically based on input/output token counts.
@@ -30,7 +30,7 @@ Authorization: Bearer <YOUR_API_KEY>
 All API requests should be prefixed with the following base URL:
 
 ```text
-https://llm.seedofcode.dev/api
+https://api.ai.seedofcode.dev/api
 ```
 *(For local testing, use `http://localhost:3000/api`)*
 
@@ -91,7 +91,7 @@ Here is a complete, end-to-end example of how to securely consume the streaming 
 async function streamChat() {
   const API_KEY = 'sk_live_your_api_key_here';
   
-  const response = await fetch('https://llm.seedofcode.dev/api/chat/stream', {
+  const response = await fetch('https://api.ai.seedofcode.dev/api/chat/stream', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
