@@ -5,7 +5,7 @@ import { RedisService } from '../../common/redis/redis.service';
 import { OllamaService } from '../../common/ollama/ollama.service';
 import { Public } from '../auth/decorators/public.decorator';
 
-type IndicatorResult = { status: 'up' | 'down'; [key: string]: unknown };
+type IndicatorResult = { status: 'up' | 'down' | 'normal';[key: string]: unknown };
 
 @Public()
 @Controller('health')
@@ -14,7 +14,7 @@ export class HealthController {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly redisService: RedisService,
     private readonly ollamaService: OllamaService,
-  ) {}
+  ) { }
 
   @Get()
   async check() {
@@ -48,7 +48,7 @@ export class HealthController {
   private async checkDatabase(): Promise<IndicatorResult> {
     try {
       await this.dataSource.query('SELECT 1');
-      return { status: 'up' };
+      return { status: 'normal' };
     } catch (e) {
       return { status: 'down', error: (e as Error).message };
     }
