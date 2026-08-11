@@ -16,7 +16,8 @@ export class OllamaService {
   constructor(private readonly configService: ConfigService) {
     this.client = new Ollama({
       host: this.configService.get<string>(
-        'OLLAMA_HOST',
+        this.configService.get<string>('NODE_ENV') === "production" ?
+          'PROD_OLLAMA_HOST' : 'DEV_OLLAMA_HOST',
         'http://127.0.0.1:11434',
       ),
     });
