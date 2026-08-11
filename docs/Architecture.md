@@ -488,34 +488,46 @@ Auth  [DONE — see standalone Auth Module doc for full spec]
   POST   /auth/otp/generate    (email verification only)
   POST   /auth/otp/verify
 
-API Keys
+API Keys [DONE]
   GET    /apikeys
   POST   /apikeys
   PATCH  /apikeys/:id
   DELETE /apikeys/:id
   POST   /apikeys/:id/regenerate
 
-Credits / Usage
-  GET    /credits/balance
-  GET    /usage
-  GET    /usage/today
+Credits / Usage [DONE]
+  GET    /credits/wallet/balance [DONE]
+  POST   /credits/wallet/sync    [DONE]
+  GET    /usage                  [DONE]
+  GET    /usage/today            [DONE]
 
-Models
+Models [DONE]
   GET    /models              (proxied/cached from `ollama list`)
   GET    /models/:name
   GET    /models/family/:family
 
-Admin (Models)
+Admin (Usage) [DONE]
+ 
+  GET    /admin/usage
+  GET    /admin/usage/today
+
+Admin (Models) [DONE]
   POST   /admin/models/sync   (syncs with Ollama and saves to DB)
   PATCH  /admin/models/:id    (updates model info in DB)
 
-Inference  (the actual product surface for the other project)
+Admin (Credits) [DONE]
+  GET    /admin/credits/wallet/:userId/balance
+  PATCH  /admin/credits/wallet/:userId
+  DELETE /admin/credits/wallet/:userId
+  POST   /admin/credits/wallet/:userId/sync
+
+Inference  (the actual product surface for the other project) [DONE]
   POST   /chat
   POST   /chat/stream
   POST   /generate
   POST   /generate/stream
 
-Health
+Health [DONE]
   GET    /health
   GET    /health/database
   GET    /health/redis
@@ -584,29 +596,29 @@ server {
 - [x] Stand up Redis in Docker on the VM with persistence disabled (`--save ""`, `appendonly no`) — rate-limit counters only, no volume growth expected
 - [x] Build `auth` module: register/login/refresh/logout, JWT strategy, password hashing (argon2/bcrypt), OTP generate/verify (email verification only)
 - [x] Build `apikeys` module: create/list/delete, key hashing, `ApiKeyGuard`
-- [] Update Nginx to proxy to NestJS (§9); confirm Ollama is bound to localhost only
+- [ ] Update Nginx to proxy to NestJS (§9); confirm Ollama is bound to localhost only
 - [x] Global middleware: Helmet, CORS, compression, request ID, Pino request logger
 
-### **Day 2 — Queue & Inference Gateway**
-- [ ] Add Redis + BullMQ, create `generation` queue with priority by plan
-- [ ] Build `worker` service: consumes queue, calls Ollama (`/api/chat`, `/api/generate`), handles streaming responses back through SSE
+### **Day 2 — Queue & Inference Gateway** ✅
+- [x] Add Redis + BullMQ, create `generation` queue with priority by plan
+- [x] Build `worker` service: consumes queue, calls Ollama (`/api/chat`, `/api/generate`), handles streaming responses back through SSE
 - [x] Build `/models` endpoint (list from Ollama, cache in `ModelInfo` table)
 - [x] Build `/chat`, `/chat/stream`, `/generate`, `/generate/stream` controllers → enqueue jobs, relay worker output to client
-- [ ] Health endpoints: `/health/database`, `/health/redis`, `/health/ollama`
+- [x] Health endpoints: `/health/database`, `/health/redis`, `/health/ollama`
 
 ### **Day 3 — Credits, Rate Limiting & Hardening**
-- [ ] Build `credits` module: wallet creation on signup, `CreditsGuard` (pre-check), post-completion deduction logic (atomic transaction), refund-on-failure logic
-- [ ] Build `usage` module: `GET /usage`, `GET /usage/today` from `UsageLog`
-- [ ] Wire up `@nestjs/throttler` with Redis store per §7 table
-- [ ] End-to-end test: register → create API key → call `/chat/stream` from the *other project* → confirm credits deduct correctly → confirm rate limit triggers correctly → confirm refund-on-error works (simulate by killing Ollama mid-request)
-- [ ] Write a short internal README for the other project: base URL, auth header format, endpoint list, error codes (`401`, `402`, `429`)
+- [x] Build `credits` module: wallet creation on signup, `CreditsGuard` (pre-check)
+- [x] Build `credits` module worker logic: post-completion deduction logic (atomic transaction), refund-on-failure logic
+- [x] Build `usage` module: `GET /usage`, `GET /usage/today` from `UsageLog`
+- [x] End-to-end test: register → create API key → call `/chat/stream` from the *other project* → confirm credits deduct correctly → confirm rate limit triggers correctly (deferred throttler) → confirm refund-on-error works (simulate by crashing worker mid-request)
+- [x] Write a short internal README for the other project: base URL, auth header format, endpoint list, error codes (`401`, `402`, `429`)
 
 By end of Day 3, the other project can authenticate with an API key, send chat/generate requests, get streamed responses, and have credits tracked and enforced — which is the actual bar for "AI credits platform" MVP.
 
 ---
 
 ## 11. Phase 2+ — Future Roadmap (not in the 3-day scope, kept for reference)
-
+- Wire up `@nestjs/throttler` with Redis store per §7 table
 - Stripe billing integration + `/billing`, `/subscription/*`, `/webhooks/stripe`
 - Admin dashboard: `/admin/*`, `/analytics/*`, online users, queue length, revenue
 - Monitoring stack: Prometheus, Grafana, Loki

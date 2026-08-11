@@ -1,10 +1,19 @@
-import { Injectable, UnauthorizedException, NotFoundException, BadRequestException, ForbiddenException, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  UnauthorizedException,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, IsNull } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 
 import { UserService } from '../user/user.service';
 import { RefreshToken } from './entities/refresh-token.entity';
@@ -12,17 +21,33 @@ import { OtpPurpose } from './entities/email-otp.entity';
 import { OtpService } from './otp.service';
 import { RegisterDto, LoginDto, VerifyOtpDto } from './dto/auth.dto';
 import { User } from '../user/entities/user.entity';
+import { CreditsService } from '../credits/credits.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+  // Precomputed valid bcrypt hash used to keep login timing constant when the
+  // email doesn't exist (defeats the user-enumeration timing oracle).
+  private readonly dummyPasswordHash = bcrypt.hashSync(
+    'timing-attack-mitigation',
+    10,
+  );
+
   constructor(
     private userService: UserService,
     private jwtService: JwtService,
     private configService: ConfigService,
     private otpService: OtpService,
+    private creditsService: CreditsService,
     @InjectRepository(RefreshToken)
     private refreshTokenRepo: Repository<RefreshToken>,
   ) { }
+
+  private hashToken(token: string): string {
+    // SHA-256, not bcrypt: a signed JWT exceeds bcrypt's 72-byte input cap and
+    // would be silently truncated. The token is already high-entropy.
+    return createHash('sha256').update(token).digest('hex');
+  }
 
   async register(registerDto: RegisterDto) {
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
@@ -33,20 +58,38 @@ export class AuthService {
       // verified: false is default from the DB
     });
 
+    // Per architecture §5.4, every new user gets a wallet + signup-bonus ledger
+    // entry at registration. Best-effort: a failure here shouldn't block signup
+    // (the user can self-heal later via POST /credits/wallet/sync).
+    // try {
+    //   await this.creditsService.createWallet(user.id);
+    // } catch (e) {
+    //   this.logger.error(
+    //     `Failed to create wallet on register for user ${user.id}`,
+    //     e as Error,
+    //   );
+    // }
+
     // Automatically generate OTP in the background
-    this.requestEmailVerification(user.id).catch(e => console.error('Failed to auto-generate OTP on register', e));
+    this.requestEmailVerification(user.id).catch((e) =>
+      this.logger.error('Failed to auto-generate OTP on register', e),
+    );
 
     return this.generateTokens(user);
   }
 
   async login(loginDto: LoginDto) {
     const user = await this.userService.findByEmail(loginDto.email);
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
 
-    const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
-    if (!isPasswordValid) {
+    // Always run a bcrypt comparison (against a dummy hash when the user is
+    // missing) so response time doesn't reveal whether the email exists.
+    const passwordHash = user?.password ?? this.dummyPasswordHash;
+    const isPasswordValid = await bcrypt.compare(
+      loginDto.password,
+      passwordHash,
+    );
+
+    if (!user || !isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -71,11 +114,21 @@ export class AuthService {
       where: { id: payload.jti },
     });
 
-    if (!storedToken || storedToken.revoked) {
+    if (!storedToken) {
       throw new UnauthorizedException('Refresh token revoked or invalid');
     }
 
-    const isMatch = await bcrypt.compare(token, storedToken.tokenHash);
+    // Reuse of an already-rotated (revoked) token signals possible theft.
+    // Revoke the entire token family for this user and reject.
+    if (storedToken.revoked) {
+      await this.refreshTokenRepo.update(
+        { userId: storedToken.userId },
+        { revoked: true },
+      );
+      throw new UnauthorizedException('Refresh token reuse detected');
+    }
+
+    const isMatch = this.hashToken(token) === storedToken.tokenHash;
     if (!isMatch) {
       throw new UnauthorizedException('Refresh token invalid');
     }
@@ -84,7 +137,12 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token expired');
     }
 
-    const user = await this.userService.findById(payload.sub);
+    let user: User;
+    try {
+      user = await this.userService.findById(payload.sub);
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
 
     // Rotate refresh token: revoke old one
     storedToken.revoked = true;
@@ -106,14 +164,26 @@ export class AuthService {
 
     const jti = randomUUID();
 
-    const refreshToken = this.jwtService.sign({ ...payload, jti }, {
-      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN', '7d') as any,
-    });
+    const refreshToken = this.jwtService.sign(
+      { ...payload, jti },
+      {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        expiresIn: this.configService.get(
+          'JWT_REFRESH_EXPIRES_IN',
+          '7d',
+        ) as any,
+      },
+    );
 
-    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // Default 7 days
+    const hashedRefreshToken = this.hashToken(refreshToken);
+    // Derive DB expiry from the token's own `exp` so the two can never diverge
+    // regardless of JWT_REFRESH_EXPIRES_IN.
+    const decoded = this.jwtService.decode(refreshToken) as {
+      exp?: number;
+    } | null;
+    const expiresAt = decoded?.exp
+      ? new Date(decoded.exp * 1000)
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     await this.refreshTokenRepo.save(
       this.refreshTokenRepo.create({
@@ -145,7 +215,11 @@ export class AuthService {
       return { alreadyVerified: true, message: 'User is already verified' };
     }
 
-    return this.otpService.generate(userId, user.email, OtpPurpose.EMAIL_VERIFICATION);
+    return this.otpService.generate(
+      userId,
+      user.email,
+      OtpPurpose.EMAIL_VERIFICATION,
+    );
   }
 
   async confirmEmailVerification(userId: string, otp: string) {
@@ -161,6 +235,18 @@ export class AuthService {
     await this.otpService.verify(userId, otp, OtpPurpose.EMAIL_VERIFICATION);
 
     await this.userService.update(user.id, { verified: true });
+
+    // Wallet is normally created at registration; this is an idempotent
+    // safety net for accounts created before that path, or where it failed.
+    try {
+      await this.creditsService.checkAndCreateWallet(user.id);
+    } catch (e) {
+      this.logger.error(
+        'Failed to ensure wallet during email verification',
+        e as Error,
+      );
+      // We don't throw here because email verification succeeded.
+    }
 
     return { verified: true, message: 'Email verified successfully' };
   }

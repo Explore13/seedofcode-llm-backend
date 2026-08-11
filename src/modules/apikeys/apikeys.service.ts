@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as crypto from 'crypto';
@@ -11,13 +15,17 @@ export class ApiKeysService {
   constructor(
     @InjectRepository(ApiKey)
     private readonly apiKeyRepo: Repository<ApiKey>,
-  ) { }
+  ) {}
 
   private hashKey(rawKey: string): string {
     return crypto.createHash('sha256').update(rawKey).digest('hex');
   }
 
-  private generateKey(mode: 'live' | 'test' = 'live'): { rawKey: string; keyHash: string; keyPrefix: string } {
+  private generateKey(mode: 'live' | 'test' = 'live'): {
+    rawKey: string;
+    keyHash: string;
+    keyPrefix: string;
+  } {
     const randomBytes = crypto.randomBytes(32).toString('hex');
     const rawKey = `soc_${mode}_${randomBytes}`;
     const keyHash = this.hashKey(rawKey);
@@ -28,13 +36,19 @@ export class ApiKeysService {
     return { rawKey, keyHash, keyPrefix };
   }
 
-  async createKey(userId: string, name: string, mode: 'live' | 'test' = 'live'): Promise<{ rawKey: string; apiKey: ApiKey }> {
+  async createKey(
+    userId: string,
+    name: string,
+    mode: 'live' | 'test' = 'live',
+  ): Promise<{ rawKey: string; apiKey: ApiKey }> {
     const activeCount = await this.apiKeyRepo.count({
       where: { userId, isActive: true },
     });
 
     if (activeCount >= 10) {
-      throw new BadRequestException('You have reached the maximum limit of 10 active API keys.');
+      throw new BadRequestException(
+        'You have reached the maximum limit of 10 active API keys.',
+      );
     }
 
     const { rawKey, keyHash, keyPrefix } = this.generateKey(mode);
@@ -60,7 +74,7 @@ export class ApiKeysService {
     });
 
     // Strip keyHash from the returned entities
-    return keys.map(key => {
+    return keys.map((key) => {
       const { keyHash, ...safeKey } = key;
       return safeKey as ApiKey;
     });
@@ -81,7 +95,11 @@ export class ApiKeysService {
     await this.apiKeyRepo.softRemove(key);
   }
 
-  async updateKey(userId: string, keyId: string, updateData: UpdateApiKeyDto): Promise<Omit<ApiKey, 'keyHash'>> {
+  async updateKey(
+    userId: string,
+    keyId: string,
+    updateData: UpdateApiKeyDto,
+  ): Promise<Omit<ApiKey, 'keyHash'>> {
     // Note: TypeORM automatically excludes soft-deleted rows, so this will only find keys that aren't deleted
     const key = await this.apiKeyRepo.findOne({
       where: { id: keyId, userId },
@@ -103,7 +121,9 @@ export class ApiKeysService {
         });
 
         if (activeCount >= 10) {
-          throw new BadRequestException('You have reached the maximum limit of 10 active API keys.');
+          throw new BadRequestException(
+            'You have reached the maximum limit of 10 active API keys.',
+          );
         }
       }
       key.isActive = updateData.isActive;
@@ -114,7 +134,10 @@ export class ApiKeysService {
     return safeKey as ApiKey;
   }
 
-  async regenerateKey(userId: string, keyId: string): Promise<{ rawKey: string }> {
+  async regenerateKey(
+    userId: string,
+    keyId: string,
+  ): Promise<{ rawKey: string }> {
     const key = await this.apiKeyRepo.findOne({
       where: { id: keyId, userId },
     });
@@ -130,13 +153,17 @@ export class ApiKeysService {
 
     key.keyHash = keyHash;
     key.keyPrefix = keyPrefix;
+    key.isActive = true; // a freshly regenerated key must be usable
+    key.lastUsedAt = null as any; // stale usage metadata no longer applies
 
     await this.apiKeyRepo.save(key);
 
     return { rawKey };
   }
 
-  async validateKey(rawKey: string): Promise<{ userId: string; role: string; apiKeyId: string } | null> {
+  async validateKey(
+    rawKey: string,
+  ): Promise<{ userId: string; role: string; apiKeyId: string } | null> {
     const keyHash = this.hashKey(rawKey);
 
     // We must join the User table to retrieve the actual role.
@@ -149,11 +176,18 @@ export class ApiKeysService {
       return null;
     }
 
-    // Async update lastUsedAt to avoid blocking the auth phase latency
-    this.apiKeyRepo.update(key.id, { lastUsedAt: new Date() }).catch(err => {
-      // Typically log this error in a real production system using a logger service
-      console.error('Failed to update lastUsedAt for API Key', err);
-    });
+    // Throttle lastUsedAt writes: only persist if it hasn't been updated in the
+    // last 60s, so a high-QPS consumer doesn't trigger a DB write on every call.
+    const now = Date.now();
+    const lastUsed = key.lastUsedAt ? key.lastUsedAt.getTime() : 0;
+    if (now - lastUsed > 60_000) {
+      // Fire-and-forget so we never block the auth phase on this write.
+      this.apiKeyRepo
+        .update(key.id, { lastUsedAt: new Date() })
+        .catch((err) => {
+          console.error('Failed to update lastUsedAt for API Key', err);
+        });
+    }
 
     return {
       userId: key.user.id,

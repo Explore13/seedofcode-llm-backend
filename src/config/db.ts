@@ -15,9 +15,14 @@ export const typeOrmConfig = (config: ConfigService): TypeOrmModuleOptions => {
     autoLoadEntities: true,
     synchronize: false,
     logging: !isProd,
-    ssl: config.get<string>(`${prefix}_SSL`) === 'true' ? {
-      rejectUnauthorized: false,
-    } : false,
+    // Verify the server certificate in production (Neon presents a valid CA
+    // chain); disabling verification there would expose the DB link to MITM.
+    ssl:
+      config.get<string>(`${prefix}_SSL`) === 'true'
+        ? {
+            rejectUnauthorized: isProd,
+          }
+        : false,
     retryAttempts: 10,
     retryDelay: 3000,
     extra: {

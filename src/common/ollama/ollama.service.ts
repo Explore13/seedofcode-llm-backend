@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Ollama } from 'ollama';
-import { ChatParams, NormalizedChatResult } from './ollama.types';
+import {
+  ChatParams,
+  GenerateParams,
+  NormalizedChatResult,
+  NormalizedGenerateResult,
+} from './ollama.types';
 
 @Injectable()
 export class OllamaService {
@@ -10,7 +15,10 @@ export class OllamaService {
 
   constructor(private readonly configService: ConfigService) {
     this.client = new Ollama({
-      host: this.configService.get<string>('OLLAMA_URL', 'https://llm.seedofcode.dev'),
+      host: this.configService.get<string>(
+        'OLLAMA_HOST',
+        'http://127.0.0.1:11434',
+      ),
     });
   }
 
@@ -50,6 +58,32 @@ export class OllamaService {
       options: { ...this.defaultOptions, ...params.options },
     });
   }
+
+  async generate(params: GenerateParams): Promise<NormalizedGenerateResult> {
+    const start = Date.now();
+    const response = await this.client.generate({
+      model: params.model,
+      prompt: params.prompt,
+      stream: false,
+      think: params.think as any,
+      options: { ...this.defaultOptions, ...params.options },
+    });
+    return {
+      content: response.response,
+      promptTokens: response.prompt_eval_count,
+      completionTokens: response.eval_count,
+      durationMs: Date.now() - start,
+      modelUsed: response.model,
+    };
+  }
+
+  generateStream(params: GenerateParams) {
+    return this.client.generate({
+      model: params.model,
+      prompt: params.prompt,
+      stream: true,
+      think: params.think as any,
+      options: { ...this.defaultOptions, ...params.options },
+    });
+  }
 }
-
-

@@ -16,3 +16,19 @@ export interface NormalizedChatResult {
   durationMs: number;
   modelUsed?: string;
 }
+
+export interface GenerateParams {
+  model: string;
+  prompt: string;
+  options?: { temperature?: number; top_p?: number; num_ctx?: number };
+  think?: boolean | 'low' | 'medium' | 'high' | 'max';
+}
+
+export interface NormalizedGenerateResult {
+  content: string;
+  thinking?: string;
+  promptTokens: number;
+  completionTokens: number;
+  durationMs: number;
+  modelUsed?: string;
+}

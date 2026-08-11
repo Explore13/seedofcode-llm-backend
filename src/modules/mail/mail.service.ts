@@ -9,11 +9,14 @@ export class MailService {
   private readonly from: string;
 
   constructor(private configService: ConfigService) {
-    this.from = this.configService.get<string>('SMTP_FROM', 'noreply@seedofcode.dev');
+    this.from = this.configService.get<string>(
+      'SMTP_FROM',
+      'noreply@seedofcode.dev',
+    );
     this.transporter = nodemailer.createTransport({
       host: this.configService.get<string>('SMTP_HOST'),
       port: this.configService.get<number>('SMTP_PORT', 587),
-      secure: this.configService.get<number>('SMTP_PORT') === 465,
+      secure: Number(this.configService.get('SMTP_PORT')) === 465,
       auth: {
         user: this.configService.get<string>('SMTP_USER'),
         pass: this.configService.get<string>('SMTP_PASS'),
@@ -42,7 +45,10 @@ export class MailService {
       this.logger.log(`OTP email sent successfully to ${to}`);
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send OTP email to ${to}`, (error as Error).stack);
+      this.logger.error(
+        `Failed to send OTP email to ${to}`,
+        (error as Error).stack,
+      );
       return false;
     }
   }

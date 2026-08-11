@@ -26,13 +26,34 @@ async function bootstrap() {
 
   app.useLogger(app.get(Logger));
   app.use(helmet());
-  app.use(compression());
+  app.use(
+    compression({
+      // Never buffer/gzip SSE responses — it breaks token-by-token streaming.
+      filter: (req, res) => {
+        if (
+          req.headers.accept === 'text/event-stream' ||
+          (req.path && req.path.includes('/stream'))
+        ) {
+          return false;
+        }
+        return compression.filter(req, res);
+      },
+    }),
+  );
 
-  // Configure CORS using environment variable
-  const allowedOriginsStr = process.env.CORS_ALLOWED_ORIGINS || '*';
-  let origin: any = '*';
-  if (allowedOriginsStr !== '*') {
+  // Configure CORS using environment variable. Never silently fall back to a
+  // wildcard in production — that would allow any origin to call the API.
+  const isProd = process.env.NODE_ENV === 'production';
+  const allowedOriginsStr = process.env.CORS_ALLOWED_ORIGINS;
+  let origin: any;
+  if (allowedOriginsStr && allowedOriginsStr !== '*') {
     origin = allowedOriginsStr.split(',').map((o) => o.trim());
+  } else if (isProd) {
+    throw new Error(
+      'CORS_ALLOWED_ORIGINS must be set to explicit origin(s) in production',
+    );
+  } else {
+    origin = '*';
   }
 
   app.enableCors({

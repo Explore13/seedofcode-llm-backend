@@ -12,4 +12,4 @@ import { OllamaModule } from '../../common/ollama/ollama.module';
   providers: [ModelsService],
   exports: [ModelsService],
 })
-export class ModelsModule {}
+export class ModelsModule { }

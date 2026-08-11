@@ -1,7 +1,17 @@
 import { Controller, Post, Body, Get, UseGuards, Req } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, VerifyOtpDto } from './dto/auth.dto';
+import {
+  RegisterDto,
+  LoginDto,
+  VerifyOtpDto,
+  RefreshTokenDto,
+} from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './decorators/public.decorator';
 import { AllowUnverified } from './decorators/allow-unverified.decorator';
@@ -9,7 +19,7 @@ import { AllowUnverified } from './decorators/allow-unverified.decorator';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   @Public()
   @Post('register')
@@ -35,8 +45,8 @@ export class AuthController {
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiResponse({ status: 200, description: 'Token refreshed' })
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
-  async refresh(@Body('refresh_token') refreshToken: string) {
-    return this.authService.refresh(refreshToken);
+  async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
+    return this.authService.refresh(refreshTokenDto.refresh_token);
   }
 
   @ApiBearerAuth('bearerAuth')
@@ -78,6 +88,9 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'OTP verified' })
   @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
   async verifyOtp(@Req() req: any, @Body() verifyOtpDto: VerifyOtpDto) {
-    return this.authService.confirmEmailVerification(req.user.id, verifyOtpDto.otp);
+    return this.authService.confirmEmailVerification(
+      req.user.id,
+      verifyOtpDto.otp,
+    );
   }
 }
