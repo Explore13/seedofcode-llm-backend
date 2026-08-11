@@ -12,10 +12,11 @@ import {
   BadRequestException,
   ClassSerializerInterceptor,
   ValidationPipe,
+  RequestMethod,
 } from '@nestjs/common';
 import { useContainer } from 'class-validator';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+// import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { HttpExceptionFilter } from './common/exceptions/http.exception';
 
 async function bootstrap() {
@@ -67,8 +68,10 @@ async function bootstrap() {
     prefix: '/assets/',
   });
 
-  // Set global prefix for all routes
-  app.setGlobalPrefix('api');
+  // Set global prefix for all routes except the root landing page
+  app.setGlobalPrefix('api', {
+    exclude: [{ path: '/', method: RequestMethod.GET }],
+  });
 
   // Enable class-validator to use Nest's dependency injection
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
@@ -106,23 +109,23 @@ async function bootstrap() {
   // Global filter to handle exceptions and format error responses
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  const config = new DocumentBuilder()
-    .setTitle('SeedOfCode LLM API')
-    .setDescription('API documentation for the SeedOfCode LLM Platform')
-    .setVersion('1.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description: 'Enter JWT token obtained from login',
-      },
-      'bearerAuth', // This name must match @ApiBearerAuth('bearerAuth')
-    )
-    .build();
+  // const config = new DocumentBuilder()
+  //   .setTitle('SeedOfCode LLM API')
+  //   .setDescription('API documentation for the SeedOfCode LLM Platform')
+  //   .setVersion('1.0')
+  //   .addBearerAuth(
+  //     {
+  //       type: 'http',
+  //       scheme: 'bearer',
+  //       bearerFormat: 'JWT',
+  //       description: 'Enter JWT token obtained from login',
+  //     },
+  //     'bearerAuth', // This name must match @ApiBearerAuth('bearerAuth')
+  //   )
+  //   .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api-docs', app, document);
+  // const document = SwaggerModule.createDocument(app, config);
+  // SwaggerModule.setup('api-docs', app, document);
 
   await app.listen(process.env.PORT ?? 3000, () => {
     console.log(`Server is running on port ${process.env.PORT ?? 3000}`);
