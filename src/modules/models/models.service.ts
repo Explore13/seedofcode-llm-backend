@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { isUUID } from 'class-validator';
 import { ModelInfo, ModelProvider } from './entities/model-info.entity';
 import { OllamaService } from '../../common/ollama/ollama.service';
 
@@ -29,6 +30,95 @@ export class ModelsService {
 
   async findByFamily(family: string): Promise<ModelInfo[]> {
     return this.modelInfoRepo.find({ where: { family, enabled: true } });
+  }
+
+  async findAll(includeDeleted = false): Promise<ModelInfo[]> {
+    return this.modelInfoRepo.find({
+      withDeleted: includeDeleted,
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findById(id: string, includeDeleted = false): Promise<ModelInfo> {
+    const model = await this.modelInfoRepo.findOne({
+      where: { id },
+      withDeleted: includeDeleted,
+    });
+    if (!model) {
+      throw new NotFoundException(`Model with ID '${id}' not found`);
+    }
+    return model;
+  }
+
+  async findByNameOrThrow(
+    name: string,
+    includeDeleted = false,
+  ): Promise<ModelInfo> {
+    const model = await this.modelInfoRepo.findOne({
+      where: { name },
+      withDeleted: includeDeleted,
+    });
+    if (!model) {
+      throw new NotFoundException(`Model with name '${name}' not found`);
+    }
+    return model;
+  }
+
+  async findByIdOrName(
+    identifier: string,
+    includeDeleted = false,
+  ): Promise<ModelInfo> {
+    if (isUUID(identifier)) {
+      return this.findById(identifier, includeDeleted);
+    }
+    return this.findByNameOrThrow(identifier, includeDeleted);
+  }
+
+  async softDeleteById(
+    id: string,
+  ): Promise<{ success: boolean; message: string; data: ModelInfo }> {
+    const model = await this.modelInfoRepo.findOne({ where: { id } });
+    if (!model) {
+      throw new NotFoundException(`Model with ID '${id}' not found`);
+    }
+
+    model.enabled = false;
+    await this.modelInfoRepo.save(model);
+    const softDeleted = await this.modelInfoRepo.softRemove(model);
+
+    return {
+      success: true,
+      message: `Model '${model.name}' (ID: ${id}) soft-deleted successfully`,
+      data: softDeleted,
+    };
+  }
+
+  async softDeleteByName(
+    name: string,
+  ): Promise<{ success: boolean; message: string; data: ModelInfo }> {
+    const model = await this.modelInfoRepo.findOne({ where: { name } });
+    if (!model) {
+      throw new NotFoundException(`Model with name '${name}' not found`);
+    }
+
+    model.enabled = false;
+    await this.modelInfoRepo.save(model);
+    const softDeleted = await this.modelInfoRepo.softRemove(model);
+
+    return {
+      success: true,
+      message: `Model '${model.name}' soft-deleted successfully`,
+      data: softDeleted,
+    };
+  }
+
+  async softDeleteByIdOrName(
+    identifier: string,
+  ): Promise<{ success: boolean; message: string; data: ModelInfo }> {
+    if (isUUID(identifier)) {
+      return this.softDeleteById(identifier);
+    }
+    return this.softDeleteByName(identifier);
   }
 
   async updateModel(
@@ -118,6 +208,7 @@ export class ModelsService {
 
         const existingModel = await this.modelInfoRepo.findOne({
           where: { name: model.name },
+          withDeleted: true,
         });
 
         if (existingModel) {
@@ -130,6 +221,7 @@ export class ModelsService {
           existingModel.sizeBytes = model.size?.toString() as any;
           existingModel.digest = model.digest as any;
           existingModel.enabled = true; // re-enable a model that reappeared in Ollama
+          existingModel.deletedAt = null as any;
           existingModel.lastSyncedAt = new Date();
           await this.modelInfoRepo.save(existingModel);
           syncedModels.push(existingModel);
