@@ -15,8 +15,8 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return app info object', () => {
+      expect(appController.getHello()).toHaveProperty('title', 'Seedofcode AI');
     });
   });
 });

@@ -11,7 +11,7 @@ export class HybridAuthGuard implements CanActivate {
     private readonly jwtAuthGuard: JwtAuthGuard,
     private readonly apiKeyGuard: ApiKeyGuard,
     private readonly reflector: Reflector,
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
@@ -24,22 +24,43 @@ export class HybridAuthGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const authHeader = request.headers.authorization;
+    const xApiKey = request.headers?.['x-api-key'];
+    const authHeader = request.headers?.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Missing or invalid Authorization header');
-    }
-
-    const token = authHeader.split(' ')[1];
-
-    if (!token) {
-      throw new UnauthorizedException('Missing or invalid Authorization header');
-    }
-
-    if (token.startsWith('soc_live_') || token.startsWith('soc_test_')) {
+    // 1. If 'x-api-key' header is present, delegate directly to ApiKeyGuard
+    if (xApiKey) {
       return this.apiKeyGuard.canActivate(context);
     }
 
+    if (!authHeader || typeof authHeader !== 'string') {
+      throw new UnauthorizedException(
+        'Missing or invalid authorization credentials',
+      );
+    }
+
+    const trimmed = authHeader.trim();
+    const parts = trimmed.split(/\s+/);
+    const scheme = parts[0]?.toLowerCase();
+    const token = parts[1];
+
+    // 2. If 'Authorization: api_key <token>' or 'Authorization: apikey <token>', delegate to ApiKeyGuard
+    if (
+      ['api_key', 'apikey'].includes(scheme) &&
+      token &&
+      (token.startsWith('soc_live_') || token.startsWith('soc_test_'))
+    ) {
+      return this.apiKeyGuard.canActivate(context);
+    }
+
+    // 3. If 'Authorization: Bearer <token>'
+    // if (scheme === 'bearer' && parts[1]) {
+    //   const token = parts[1];
+    //   if (token.startsWith('soc_live_') || token.startsWith('soc_test_')) {
+    //     return this.apiKeyGuard.canActivate(context);
+    //   }
+    // }
+
+    // 4. Default: delegate to JwtAuthGuard
     const result = this.jwtAuthGuard.canActivate(context);
     if (result instanceof Observable) {
       return await lastValueFrom(result);
