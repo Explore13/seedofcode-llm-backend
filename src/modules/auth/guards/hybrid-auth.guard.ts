@@ -53,12 +53,12 @@ export class HybridAuthGuard implements CanActivate {
     }
 
     // 3. If 'Authorization: Bearer <token>'
-    // if (scheme === 'bearer' && parts[1]) {
-    //   const token = parts[1];
-    //   if (token.startsWith('soc_live_') || token.startsWith('soc_test_')) {
-    //     return this.apiKeyGuard.canActivate(context);
-    //   }
-    // }
+    if (scheme === 'bearer' && parts[1]) {
+      const token = parts[1];
+      if (token.startsWith('soc_live_') || token.startsWith('soc_test_')) {
+        return this.apiKeyGuard.canActivate(context);
+      }
+    }
 
     // 4. Default: delegate to JwtAuthGuard
     const result = this.jwtAuthGuard.canActivate(context);

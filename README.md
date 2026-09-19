@@ -10,18 +10,25 @@ Before you can make API requests, you will need an active account and a valid AP
 
 1. **Register**: Navigate to [ai.seedofcode.dev](https://ai.seedofcode.dev) (Note: The frontend UI is currently in development).
 2. **Verify**: Complete the email verification process to activate your account.
-3. **Generate API Key**: Create a new API Key in your dashboard. Keep this key secure; you will only be able to view the full secret key once.
+3. **Generate API Key**: Create a new API Key in your dashboard. Keep this key secure; you will only be able to view the full secret key once. API keys begin with `soc_live_` (for production) or `soc_test_` (for testing).
 4. **Credits**: New accounts receive a signup bonus of credits. Inference costs are calculated dynamically based on input/output token counts.
 
 ---
 
 ## Authentication
 
-The API uses standard Bearer Token authentication. All inference endpoints require your secret API key to be sent in the `Authorization` HTTP header.
+The API uses standard API Key authentication. All inference endpoints require your secret API key. You can pass the key in one of two ways:
 
+**Option 1: Using the `x-api-key` header**
 ```http
-Authorization: Bearer <YOUR_API_KEY>
+x-api-key: soc_live_YOUR_API_KEY
 ```
+
+**Option 2: Using the `Authorization` header**
+```http
+Authorization: Bearer soc_live_YOUR_API_KEY
+```
+*(You may also use `Authorization: api_key soc_live_YOUR_API_KEY`)*
 
 ---
 
@@ -32,7 +39,7 @@ All API requests should be prefixed with the following base URL:
 ```text
 https://api.ai.seedofcode.dev/api
 ```
-*(For local testing, use `http://localhost:3000/api`)*
+*(For local testing, use `http://localhost:8080/api`)*
 
 ---
 
@@ -45,7 +52,7 @@ Generates a response for a given chat conversation. The request blocks until the
 **Request Body:**
 ```json
 {
-  "model": "gemma4:latest",
+  "model": "llama3.1:8b",
   "messages": [
     { "role": "system", "content": "You are a helpful AI assistant." },
     { "role": "user", "content": "What is 2+2?" }
@@ -62,7 +69,7 @@ Streams the response back in real-time via Server-Sent Events (SSE). This is hig
 **Response:**
 Returns a continuous stream of JSON chunks:
 ```json
-data: {"model":"gemma4:latest","message":{"role":"assistant","content":"4"},"done":false}
+data: {"model":"llama3.1:8b","message":{"role":"assistant","content":"4"},"done":false}
 ```
 
 ### 3. Generate (Raw Prompt)
@@ -72,7 +79,7 @@ Used for raw text completion without chat conversational formatting.
 **Request Body:**
 ```json
 {
-  "model": "gemma4:latest",
+  "model": "llama3.1:8b",
   "prompt": "The capital of France is"
 }
 ```
@@ -89,16 +96,16 @@ Here is a complete, end-to-end example of how to securely consume the streaming 
 
 ```javascript
 async function streamChat() {
-  const API_KEY = 'sk_live_your_api_key_here';
+  const API_KEY = 'soc_live_your_api_key_here';
   
   const response = await fetch('https://api.ai.seedofcode.dev/api/chat/stream', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${API_KEY}`
+      'x-api-key': API_KEY
     },
     body: JSON.stringify({
-      model: 'gemma4:latest', 
+      model: 'llama3.1:8b', 
       messages: [{ role: 'user', content: 'Say hello in 5 words.' }]
     })
   });
@@ -145,7 +152,7 @@ Our API uses standard HTTP response codes to indicate the success or failure of 
 | Status Code | Description |
 | :--- | :--- |
 | **`400 Bad Request`** | Malformed request body, missing parameters, or the requested model does not exist. |
-| **`401 Unauthorized`** | Authentication token is missing, invalid, or has been revoked. Ensure you are passing `Bearer <YOUR_API_KEY>`. |
+| **`401 Unauthorized`** | Authentication token is missing, invalid, or has been revoked. Ensure you are passing a valid `soc_live_` or `soc_test_` key. |
 | **`402 Payment Required`** | Insufficient credits in your wallet to cover the estimated reservation cost of the request. |
 | **`429 Too Many Requests`** | You have exceeded the rate limit for your current plan. Please slow down or upgrade your plan. |
 | **`500 Internal Server Error`** | An unexpected error occurred during generation or the model timed out. *(Note: No credits are deducted for failed generations).* |

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Req, Res, UnauthorizedException } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -15,11 +15,12 @@ import {
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './decorators/public.decorator';
 import { AllowUnverified } from './decorators/allow-unverified.decorator';
+import type { Response } from 'express'
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Public()
   @Post('register')
@@ -36,17 +37,41 @@ export class AuthController {
   @ApiOperation({ summary: 'Login user' })
   @ApiResponse({ status: 200, description: 'Successfully logged in' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
-  }
+  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) response: Response) {
+    const { access_token, refresh_token, user } = await this.authService.login(loginDto);
 
+    // Set refresh token cookie
+    response.cookie('refresh_token', refresh_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
+      sameSite: 'strict',
+      maxAge: 60 * 60 * 24 * 7 * 1000,
+    });
+
+    // Set access token in response body
+    return { access_token, user };
+  }
   @Public()
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiResponse({ status: 200, description: 'Token refreshed' })
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
-  async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.authService.refresh(refreshTokenDto.refresh_token);
+  async refresh(@Req() req: any, @Res({ passthrough: true }) response: Response) {
+    const refreshToken = req.cookies?.['refresh_token'];
+    if (!refreshToken) {
+      throw new UnauthorizedException('No refresh token provided in cookies');
+    }
+
+    const { access_token, refresh_token: new_refresh_token } = await this.authService.refresh(refreshToken);
+
+    response.cookie('refresh_token', new_refresh_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 60 * 60 * 24 * 7 * 1000,
+    });
+
+    return { access_token };
   }
 
   @ApiBearerAuth('bearerAuth')
@@ -55,7 +80,8 @@ export class AuthController {
   @Post('logout')
   @ApiOperation({ summary: 'Logout user and invalidate refresh tokens' })
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
-  async logout(@Req() req: any) {
+  async logout(@Req() req: any, @Res({ passthrough: true }) response: Response) {
+    response.clearCookie('refresh_token');
     return this.authService.logout(req.user.id);
   }
 

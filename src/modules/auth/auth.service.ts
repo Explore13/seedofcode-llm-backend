@@ -93,7 +93,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.generateTokens(user);
+    return await this.generateTokens(user);
   }
 
   async refresh(token: string) {

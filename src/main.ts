@@ -7,6 +7,7 @@ dns.setDefaultResultOrder('ipv4first');
 
 import helmet from 'helmet';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
@@ -31,6 +32,7 @@ async function bootstrap() {
 
   app.useLogger(app.get(Logger));
   app.use(helmet());
+  app.use(cookieParser());
   app.use(
     compression({
       // Never buffer/gzip SSE responses — it breaks token-by-token streaming.
@@ -65,6 +67,7 @@ async function bootstrap() {
     origin: origin,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+    credentials: true,
   });
 
   // Serve static assets from the "assets" directory
