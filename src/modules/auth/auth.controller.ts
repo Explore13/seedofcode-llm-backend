@@ -28,8 +28,19 @@ export class AuthController {
   @ApiResponse({ status: 201, description: 'User successfully registered' })
   @ApiResponse({ status: 400, description: 'Validation failed' })
   @ApiResponse({ status: 409, description: 'Email already exists' })
-  async register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
+  async register(@Body() registerDto: RegisterDto, @Res({ passthrough: true }) response: Response) {
+    const { access_token, refresh_token, user } = await this.authService.register(registerDto);
+
+    // Set refresh token cookie
+    response.cookie('refresh_token', refresh_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
+      sameSite: 'strict',
+      maxAge: 60 * 60 * 24 * 7 * 1000,
+    });
+
+    // Set access token in response body
+    return { access_token, user };
   }
 
   @Public()
