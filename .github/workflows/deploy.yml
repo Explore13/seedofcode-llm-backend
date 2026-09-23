@@ -20,20 +20,28 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Navigate to the app directory
+            # Exit immediately if any command exits with a non-zero status.
+            # This prevents subsequent commands from running if a previous one fails.
+            set -e
+
+            # Navigate to the application directory on the server
             cd ~/seedofcode-llm-backend
-            
-            # Pull the latest changes from the main branch
-            git pull origin main
-            
-            # Install any new dependencies
+
+            # Fetch the latest commits from the remote repository
+            git fetch --all
+
+            # Force the local repository to exactly match the remote 'main' branch,
+            # discarding any accidental local changes (like package-lock.json)
+            git reset --hard origin/main
+
+            # Install any new or updated dependencies
             npm install
-            
+
             # Build the NestJS application
             npm run build
-            
-            # Run TypeORM migrations to apply any database changes
+
+            # Run TypeORM migrations to apply any pending database schema changes
             npm run typeorm migration:run
-            
-            # Restart the PM2 process to apply the new build
+
+            # Restart the existing PM2 process to start serving the new build
             pm2 restart seedofcode-llm
