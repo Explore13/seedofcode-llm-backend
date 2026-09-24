@@ -9,7 +9,7 @@ import {
   IsNotEmpty,
 } from 'class-validator';
 import { UsageStatus } from '../entities/usage-log.entity';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class GetUsageQueryDto {
   @IsOptional()
@@ -24,6 +24,15 @@ export class GetUsageQueryDto {
   @Min(1)
   @Max(100)
   limit?: number = 10;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') return value.split(',');
+    return value;
+  })
+  @IsString({ each: true })
+  models?: string[];
 }
 
 export class AdminGetUsageQueryDto extends GetUsageQueryDto {

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import {
   Repository,
   Between,
+  In,
   FindOptionsWhere,
   EntityManager,
   DeepPartial,
@@ -23,11 +24,16 @@ export class UsageService {
   ) {}
 
   async getUserUsage(userId: string, query: GetUsageQueryDto) {
-    const { page = 1, limit = 10 } = query;
+    const { page = 1, limit = 10, models } = query;
     const skip = (page - 1) * limit;
 
+    const where: FindOptionsWhere<UsageLog> = { userId };
+    if (models && models.length > 0) {
+      where.model = In(models);
+    }
+
     const [data, total] = await this.usageLogRepository.findAndCount({
-      where: { userId },
+      where,
       order: { createdAt: 'DESC' },
       skip,
       take: limit,
