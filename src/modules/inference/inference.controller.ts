@@ -6,6 +6,7 @@ import {
   OnModuleDestroy,
   Post,
   Req,
+  Res,
   Sse,
   UseGuards,
   HttpException,
@@ -206,6 +207,53 @@ export class InferenceController {
   ): Promise<Observable<any>> {
     const ctx = await this.reserve(req, body);
     return this.createStreamObservable('generate', body, req, ctx);
+  }
+
+  @Post('chat/completions')
+  async chatCompletion(@Req() req: any, @Body() body: ChatRequestDto, @Res() res: any) {
+    // check if it is open-ai sdk or not
+    const userAgent = req.headers['user-agent'] || '';
+    if (!userAgent.toLowerCase().startsWith('openai/')) {
+      throw new HttpException(
+        'This endpoint is exclusively for OpenAI SDK integrations. Please use /api/chat instead.',
+        HttpStatus.FORBIDDEN
+      );
+    }
+    const ctx = await this.reserve(req, body);
+    const job = await this.enqueue('chat', body, req, ctx, false);
+    try {
+      // raw result
+      const result = await job.waitUntilFinished(this.queueEvents);
+
+      // mapped to standard open-ai sdk format
+      const mapped = {
+        id: `chatcmpl-${Date.now()}`,
+        object: 'chat.completion',
+        created: Math.floor(Date.now() / 1000),
+        model: result.modelUsed,
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: result.content,
+            },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {
+          prompt_tokens: ctx.estimatedPromptTokens,
+          completion_tokens: ctx.clampedMaxTokens,
+          total_tokens: ctx.estimatedPromptTokens + ctx.clampedMaxTokens,
+        },
+      };
+      res.status(200).json(mapped);
+    } catch (e: any) {
+      throw new HttpException(
+        e.message || 'Generation failed',
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
   }
 
   private async enqueue(
