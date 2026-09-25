@@ -32,7 +32,7 @@ export class AuthController {
     const { access_token, refresh_token, user } = await this.authService.register(registerDto);
 
     // Set refresh token cookie
-    response.cookie('refresh_token', refresh_token, {
+    response.cookie('soc_refresh', refresh_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
       sameSite: 'strict',
@@ -52,7 +52,7 @@ export class AuthController {
     const { access_token, refresh_token, user } = await this.authService.login(loginDto);
 
     // Set refresh token cookie
-    response.cookie('refresh_token', refresh_token, {
+    response.cookie('soc_refresh', refresh_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
       sameSite: 'strict',
@@ -68,14 +68,14 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Token refreshed' })
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
   async refresh(@Req() req: any, @Res({ passthrough: true }) response: Response) {
-    const refreshToken = req.cookies?.['refresh_token'];
+    const refreshToken = req.cookies?.['soc_refresh'];
     if (!refreshToken) {
       throw new UnauthorizedException('No refresh token provided in cookies');
     }
 
     const { access_token, refresh_token: new_refresh_token } = await this.authService.refresh(refreshToken);
 
-    response.cookie('refresh_token', new_refresh_token, {
+    response.cookie('soc_refresh', new_refresh_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
@@ -92,7 +92,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Logout user and invalidate refresh tokens' })
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
   async logout(@Req() req: any, @Res({ passthrough: true }) response: Response) {
-    response.clearCookie('refresh_token');
+    response.clearCookie('soc_refresh');
     return this.authService.logout(req.user.id);
   }
 
