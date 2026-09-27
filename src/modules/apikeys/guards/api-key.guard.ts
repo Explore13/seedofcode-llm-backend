@@ -38,6 +38,7 @@ export class ApiKeyGuard implements CanActivate {
    * Extracts API key from:
    * 1. 'x-api-key' header (must start with soc_live_ or soc_test_)
    * 2. 'Authorization: api_key <token>' / 'Authorization: apikey <token>' (must start with soc_live_ or soc_test_)
+   * 3. 'Authorization: Bearer <token>' (must start with soc_live_ or soc_test_)
    */
   private extractApiKey(request: any): string | null {
     // 1. Check 'x-api-key' header (only the raw key directly)
@@ -47,7 +48,6 @@ export class ApiKeyGuard implements CanActivate {
       if (trimmed.startsWith('soc_live_') || trimmed.startsWith('soc_test_')) {
         return trimmed;
       }
-      return null;
     }
 
     // 2. Check 'Authorization' header
@@ -58,10 +58,10 @@ export class ApiKeyGuard implements CanActivate {
       const scheme = parts[0]?.toLowerCase();
       const token = parts[1];
 
-      // If it is api_key or apikey, token must start with soc_live_ or soc_test_
+      if (!token) return null;
+
       if (
-        ['api_key', 'apikey'].includes(scheme) &&
-        token &&
+        ['api_key', 'apikey', 'bearer'].includes(scheme) &&
         (token.startsWith('soc_live_') || token.startsWith('soc_test_'))
       ) {
         return token;
